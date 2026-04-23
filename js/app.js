@@ -83,14 +83,37 @@ function startBarcode() {
 
 // ── Camera ──
 async function startCamera() {
+  const video = $('video-preview');
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
-    });
-    $('video-preview').srcObject = stream;
-  } catch {
-    showToast('Kameraya erişilemedi. Galeri kullan.');
+    // iOS için önce arka kamerayı dene, olmazsa herhangi bir kamera
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { exact: 'environment' } }
+      });
+    } catch {
+      stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    }
+    video.srcObject = stream;
+    video.setAttribute('playsinline', true);
+    video.setAttribute('autoplay', true);
+    video.setAttribute('muted', true);
+    await video.play();
+  } catch (err) {
+    showCameraError(err.message);
   }
+}
+
+function showCameraError(msg) {
+  $('video-container').innerHTML = `
+    <div style="padding:32px 20px;text-align:center;color:#7F8C8D;">
+      <div style="font-size:48px;margin-bottom:12px;">📵</div>
+      <div style="font-size:15px;font-weight:600;margin-bottom:8px;color:#2C3E50;">Kamera açılamadı</div>
+      <div style="font-size:13px;line-height:1.6;margin-bottom:20px;">${msg || 'Kamera izni verilmemiş olabilir.'}</div>
+      <label class="gallery-btn" style="display:inline-flex;padding:14px 24px;border-radius:50px;background:white;border:2px solid #E8ECF0;cursor:pointer;gap:8px;font-size:15px;">
+        🖼️ Galeriden Fotoğraf Seç
+        <input type="file" accept="image/*" style="display:none" onchange="analyzeFromFile(this.files[0])">
+      </label>
+    </div>`;
 }
 
 function stopCamera() {
@@ -151,19 +174,36 @@ async function runOCR(canvas) {
   try {
     const { createWorker } = Tesseract;
     const worker = await createWorker('chi_sim', 1, {
+      workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js',
+      langPath: 'https://cdn.jsdelivr.net/npm/tesseract.js-data@4.0.0/tessdata_best',
+      corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/tesseract-core-simd-lstm.wasm.js',
       logger: m => {
-        if (m.status === 'recognizing text') {
-          $('loading-sub').textContent = `%${Math.round(m.progress * 100)} tamamlandı`;
+        if (m.status === 'loading tesseract core') {
+          $('loading-sub').textContent = 'Tesseract yükleniyor...';
+        } else if (m.status === 'loading language traineddata') {
+          $('loading-sub').textContent = 'Çince dil paketi indiriliyor (~40MB, tek seferlik)...';
+        } else if (m.status === 'recognizing text') {
+          $('loading-sub').textContent = `Metin okunuyor: %${Math.round(m.progress * 100)}`;
         }
       }
     });
     const { data: { text } } = await worker.recognize(canvas);
     await worker.terminate();
+    if (!text || text.trim().length < 2) {
+      hideLoading();
+      showToast('Metin okunamadı. Daha yakın ve net bir fotoğraf çek.');
+      return;
+    }
     const verdict = analyzer.analyze(text);
     showResult(verdict, text, null);
   } catch (err) {
     hideLoading();
-    showToast('OCR hatası: ' + err.message);
+    const msg = err.message || '';
+    if (msg.includes('network') || msg.includes('fetch')) {
+      showToast('İnternet bağlantısı gerekli (ilk kullanımda dil paketi indirilir).');
+    } else {
+      showToast('OCR hatası: ' + msg);
+    }
   }
 }
 
