@@ -370,3 +370,130 @@ body {
   margin-bottom: 16px;
   line-height: 1.5;
 }
+
+/* ── KALIPLAR ── */
+.phrase-list { display: flex; flex-direction: column; gap: 14px; }
+
+.phrase-card {
+  background: white;
+  border-radius: var(--radius);
+  padding: 18px 16px 14px;
+  box-shadow: var(--shadow);
+  position: relative;
+}
+.phrase-chinese {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.4;
+  margin-bottom: 6px;
+}
+.phrase-pinyin {
+  font-size: 13px;
+  color: var(--green-dark);
+  margin-bottom: 8px;
+  font-style: italic;
+}
+.phrase-turkish {
+  font-size: 14px;
+  color: var(--text-light);
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+.phrase-actions {
+  display: flex;
+  gap: 8px;
+}
+.phrase-btn {
+  flex: 1;
+  border: none;
+  border-radius: 24px;
+  padding: 9px 0;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: opacity 0.15s;
+}
+.phrase-btn:active { opacity: 0.7; }
+.btn-speak { background: #EBF5FB; color: var(--blue); }
+.btn-show  { background: #EAFAF1; color: var(--green-dark); }
+
+.phrase-category-badge {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+.cat-haram      { background: #FDEDEC; color: var(--red); }
+.cat-alerji     { background: #FEF9E7; color: #D68910; }
+.cat-helal      { background: #EAFAF1; color: var(--green-dark); }
+.cat-vejetaryen { background: #E8F8F5; color: #1ABC9C; }
+.cat-soru       { background: #EBF5FB; color: var(--blue); }
+.cat-red        { background: #F5EEF8; color: #8E44AD; }
+.cat-nezaket    { background: #F0F3F4; color: #566573; }
+
+/* ── GÖSTER MODU ── */
+.show-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: white;
+  z-index: 500;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  text-align: center;
+}
+.show-modal.active { display: flex; }
+.show-modal-chinese {
+  font-size: 48px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.3;
+  margin-bottom: 20px;
+}
+.show-modal-pinyin {
+  font-size: 20px;
+  color: var(--green-dark);
+  font-style: italic;
+  margin-bottom: 20px;
+}
+.show-modal-turkish {
+  font-size: 16px;
+  color: var(--text-light);
+  line-height: 1.6;
+  margin-bottom: 40px;
+}
+.show-modal-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: #F0F3F4;
+  border: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.show-modal-speak {
+  background: var(--green);
+  color: white;
+  border: none;
+  border-radius: 50px;
+  padding: 16px 40px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}

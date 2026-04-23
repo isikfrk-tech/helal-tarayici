@@ -1,4 +1,4 @@
-const CACHE_NAME = 'helal-tarayici-v4';
+const CACHE_NAME = 'helal-tarayici-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -7,6 +7,7 @@ const ASSETS = [
   './js/analyzer.js',
   './data/ingredients.json',
   './data/products.json',
+  './data/phrases.json',
   './vendor/tesseract/tesseract.min.js',
   './vendor/tesseract/worker.min.js',
   './vendor/tesseract/tesseract-core-simd.wasm.js',

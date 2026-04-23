@@ -1,0 +1,72 @@
+[
+  {
+    "id": 1,
+    "chinese": "我不能吃猪油、起酥油、酒精和明胶。如果里面有这些，我就不要了。",
+    "pinyin": "Wǒ bù néng chī zhūyóu, qǐsūyóu, jiǔjīng hé míngjiāo. Rúguǒ lǐmiàn yǒu zhèxiē, wǒ jiù bù yào le.",
+    "turkish": "Domuz yağı, kısaltma yağı (qisuyou), alkol ya da jelatin yiyemem. İçinde bunlar varsa istemiyorum.",
+    "category": "haram"
+  },
+  {
+    "id": 2,
+    "chinese": "这里面有猪肉或者猪油吗？",
+    "pinyin": "Zhè lǐmiàn yǒu zhūròu huòzhě zhūyóu ma?",
+    "turkish": "Bunda domuz eti ya da domuz yağı var mı?",
+    "category": "haram"
+  },
+  {
+    "id": 3,
+    "chinese": "我是穆斯林，不能吃猪肉。",
+    "pinyin": "Wǒ shì mùsīlín, bù néng chī zhūròu.",
+    "turkish": "Ben Müslümanım, domuz eti yiyemem.",
+    "category": "haram"
+  },
+  {
+    "id": 4,
+    "chinese": "这里面有猪肉和猪油吗？我对猪肉和猪油过敏。",
+    "pinyin": "Zhè lǐmiàn yǒu zhūròu hé zhūyóu ma? Wǒ duì zhūròu hé zhūyóu guòmǐn.",
+    "turkish": "Bunun içinde domuz eti ve domuz yağı var mı? Domuz etine ve yağına alerjim var.",
+    "category": "alerji"
+  },
+  {
+    "id": 5,
+    "chinese": "这个肉是清真屠宰的吗？",
+    "pinyin": "Zhège ròu shì qīngzhēn túzǎi de ma?",
+    "turkish": "Bu et helal kesilmiş mi?",
+    "category": "helal"
+  },
+  {
+    "id": 6,
+    "chinese": "你们有只用蔬菜做的菜吗？",
+    "pinyin": "Nǐmen yǒu zhǐ yòng shūcài zuò de cài ma?",
+    "turkish": "Sadece sebzeden yapılmış yemeğiniz var mı?",
+    "category": "vejetaryen"
+  },
+  {
+    "id": 7,
+    "chinese": "请问附近有清真餐厅吗？",
+    "pinyin": "Qǐngwèn fùjìn yǒu qīngzhēn cāntīng ma?",
+    "turkish": "Yakınlarda helal restoran var mı?",
+    "category": "helal"
+  },
+  {
+    "id": 8,
+    "chinese": "这是什么肉？",
+    "pinyin": "Zhè shì shénme ròu?",
+    "turkish": "Bu ne eti?",
+    "category": "soru"
+  },
+  {
+    "id": 9,
+    "chinese": "抱歉，我不能吃这个。",
+    "pinyin": "Bàoqiàn, wǒ bù néng chī zhège.",
+    "turkish": "Üzgünüm, bunu yiyemiyorum.",
+    "category": "red"
+  },
+  {
+    "id": 10,
+    "chinese": "谢谢您的理解。",
+    "pinyin": "Xièxiè nín de lǐjiě.",
+    "turkish": "Anlayışınız için teşekkür ederim.",
+    "category": "nezaket"
+  }
+]

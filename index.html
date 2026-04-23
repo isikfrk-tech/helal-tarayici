@@ -51,6 +51,14 @@
       </div>
     </button>
 
+    <button class="scan-btn" onclick="showScreen('phrases')">
+      <div class="btn-icon" style="background:#F5EEF8;">💬</div>
+      <div class="btn-text">
+        <h3>İletişim Kalıpları</h3>
+        <p>Garson veya görevliye göster. Çince hazır cümleler, sesli okuma.</p>
+      </div>
+    </button>
+
     <button class="scan-btn" onclick="startBarcode()">
       <div class="btn-icon blue">|||</div>
       <div class="btn-text">
@@ -103,6 +111,23 @@
   </div>
 
 </div><!-- /screen-scan -->
+
+
+<!-- ══════════════════════════════════════════
+     EKRAN — İLETİŞİM KALIPLARI
+═══════════════════════════════════════════ -->
+<div id="screen-phrases" class="screen">
+  <div id="phrase-list" class="phrase-list"></div>
+</div>
+
+<!-- ── GÖSTER MODU (full screen) ── -->
+<div class="show-modal" id="show-modal">
+  <button class="show-modal-close" onclick="closeShowModal()">✕</button>
+  <div class="show-modal-chinese" id="show-modal-chinese"></div>
+  <div class="show-modal-pinyin"  id="show-modal-pinyin"></div>
+  <div class="show-modal-turkish" id="show-modal-turkish"></div>
+  <button class="show-modal-speak" onclick="speakCurrent()">🔊 Sesli Oku</button>
+</div>
 
 
 <!-- ══════════════════════════════════════════

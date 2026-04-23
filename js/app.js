@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Eski cache'leri temizle, sonra yeni SW kaydet
   if ('caches' in window) {
     caches.keys().then(keys => {
-      keys.filter(k => k !== 'helal-tarayici-v4').forEach(k => caches.delete(k));
+      keys.filter(k => k !== 'helal-tarayici-v5').forEach(k => caches.delete(k));
     });
   }
   if ('serviceWorker' in navigator) {
@@ -48,6 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   history = JSON.parse(localStorage.getItem('scan_history') || '[]');
   loadDatabase();
+  loadPhrases();
   renderHistory();
 
   // Tıklama teşhisi — her butona görünür tepki ekle
@@ -81,7 +82,7 @@ async function loadDatabase() {
 
 // ── Navigation ──
 function showScreen(name) {
-  ['screen-home', 'screen-scan', 'screen-paste', 'screen-result'].forEach(id => {
+  ['screen-home', 'screen-scan', 'screen-paste', 'screen-phrases', 'screen-result'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.classList.remove('active');
   });
@@ -98,6 +99,10 @@ function showScreen(name) {
   } else if (name === 'scan') {
     if (backBtn)  backBtn.style.display  = 'flex';
     if (titleEl)  titleEl.textContent    = currentMode === 'ocr' ? 'İçindekiler Tara' : 'Barkod Tara';
+  } else if (name === 'phrases') {
+    if (backBtn)  backBtn.style.display  = 'flex';
+    if (titleEl)  titleEl.textContent    = 'İletişim Kalıpları';
+    stopCamera();
   } else if (name === 'paste') {
     if (backBtn)  backBtn.style.display  = 'flex';
     if (titleEl)  titleEl.textContent    = 'Metin Yapıştır';
@@ -173,6 +178,83 @@ function showCameraFallback(msg) {
         <input type="file" accept="image/*" style="display:none" onchange="analyzeFromFile(this.files[0])">
       </label>
     </div>`;
+}
+
+// ── Kalıplar ──
+let phrases = [];
+let currentPhrase = null;
+
+async function loadPhrases() {
+  try {
+    const res = await fetch('./data/phrases.json');
+    phrases = await res.json();
+    renderPhrases();
+  } catch { /* sessiz hata */ }
+}
+
+const categoryLabels = {
+  haram:      { label: 'Haram',      cls: 'cat-haram' },
+  alerji:     { label: 'Alerji',     cls: 'cat-alerji' },
+  helal:      { label: 'Helal',      cls: 'cat-helal' },
+  vejetaryen: { label: 'Vejetaryen', cls: 'cat-vejetaryen' },
+  soru:       { label: 'Soru',       cls: 'cat-soru' },
+  red:        { label: 'Ret',        cls: 'cat-red' },
+  nezaket:    { label: 'Nezaket',    cls: 'cat-nezaket' }
+};
+
+function renderPhrases() {
+  const list = $('phrase-list');
+  if (!list || !phrases.length) return;
+  list.innerHTML = phrases.map((p, i) => {
+    const cat = categoryLabels[p.category] || { label: '', cls: '' };
+    return `
+      <div class="phrase-card">
+        <span class="phrase-category-badge ${cat.cls}">${cat.label}</span>
+        <div class="phrase-number" style="font-size:11px;color:#BDC3C7;margin-bottom:4px;">${i + 1} / ${phrases.length}</div>
+        <div class="phrase-chinese">${p.chinese}</div>
+        <div class="phrase-pinyin">${p.pinyin}</div>
+        <div class="phrase-turkish">${p.turkish}</div>
+        <div class="phrase-actions">
+          <button class="phrase-btn btn-speak" onclick="speakPhrase(${p.id})">🔊 Sesli Oku</button>
+          <button class="phrase-btn btn-show"  onclick="openShowModal(${p.id})">📱 Göster</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function speakPhrase(id) {
+  const p = phrases.find(x => x.id === id);
+  if (!p) return;
+  if (!window.speechSynthesis) { showToast('Sesli okuma desteklenmiyor.'); return; }
+  window.speechSynthesis.cancel();
+  const utt = new SpeechSynthesisUtterance(p.chinese);
+  utt.lang = 'zh-CN';
+  utt.rate = 0.85;
+  window.speechSynthesis.speak(utt);
+}
+
+function speakCurrent() {
+  if (currentPhrase) speakPhrase(currentPhrase.id);
+}
+
+function openShowModal(id) {
+  const p = phrases.find(x => x.id === id);
+  if (!p) return;
+  currentPhrase = p;
+  const modal = $('show-modal');
+  $('show-modal-chinese').textContent = p.chinese;
+  $('show-modal-pinyin').textContent  = p.pinyin;
+  $('show-modal-turkish').textContent = p.turkish;
+  if (modal) modal.classList.add('active');
+  // Ekranı açık tut (iOS otomatik karartmasını engelle)
+  if (navigator.wakeLock) navigator.wakeLock.request('screen').catch(() => {});
+}
+
+function closeShowModal() {
+  const modal = $('show-modal');
+  if (modal) modal.classList.remove('active');
+  window.speechSynthesis?.cancel();
+  currentPhrase = null;
 }
 
 // ── Metin Yapıştırma Modu ──
