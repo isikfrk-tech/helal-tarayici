@@ -29,6 +29,30 @@ class Translator {
       .filter(s => s.length > 0 && s.length <= 20);
   }
 
+  // İngilizce metin ise direkt göster (çeviri gerekmez)
+  _isEnglish(text) {
+    const chCount = (text.match(/[\u4e00-\u9fff]/g) || []).length;
+    return chCount / Math.max(text.length, 1) < 0.15;
+  }
+
+  translateIngredients(rawText) {
+    if (this._isEnglish(rawText)) return this._translateEnglishList(rawText);
+    const cleaned = this._stripLabel(rawText);
+    const items   = this._split(cleaned);
+    return items.map(item => this._translateOne(item)).filter(i => i.original.length > 0);
+  }
+
+  _translateEnglishList(rawText) {
+    const cleaned = rawText.replace(/^[\s\S]*?(?:ingredients?|contains?)[:\s]/i, '').trim();
+    const items = cleaned.split(/[,;.\n]+/).map(s => s.trim()).filter(s => s.length > 1 && s.length < 60);
+    return items.map(item => ({
+      original: item,
+      turkish:  item, // İngilizce zaten anlaşılır
+      matched:  true,
+      isEnglish: true
+    }));
+  }
+
   // Tek bir içeriği çevir — uzun eşleşmeyi önce dene (greedy)
   _translateOne(original) {
     // Tam eşleşme

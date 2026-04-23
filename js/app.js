@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Eski cache'leri temizle, sonra yeni SW kaydet
   if ('caches' in window) {
     caches.keys().then(keys => {
-      keys.filter(k => k !== 'helal-tarayici-v6').forEach(k => caches.delete(k));
+      keys.filter(k => k !== 'helal-tarayici-v7').forEach(k => caches.delete(k));
     });
   }
   if ('serviceWorker' in navigator) {
@@ -73,13 +73,15 @@ let translator = null;
 
 async function loadDatabase() {
   try {
-    const [ingRes, trRes] = await Promise.all([
+    const [ingRes, enRes, trRes] = await Promise.all([
       fetch('./data/ingredients.json'),
+      fetch('./data/ingredients_en.json'),
       fetch('./data/translations.json')
     ]);
     if (!ingRes.ok) throw new Error('HTTP ' + ingRes.status);
     db = await ingRes.json();
-    analyzer = new HalalAnalyzer(db);
+    const enDb = enRes.ok ? await enRes.json() : null;
+    analyzer = new HalalAnalyzer(db, enDb);
     if (trRes.ok) {
       const trData = await trRes.json();
       translator = new Translator(trData);
@@ -361,7 +363,7 @@ async function runOCR(canvas) {
   showLoading('OCR işleniyor...', 'İlk kullanımda ~40MB Çince paketi indirilir');
   try {
     const { createWorker } = Tesseract;
-    const worker = await createWorker('chi_sim', 1, {
+    const worker = await createWorker('chi_sim+eng', 1, {
       workerPath: './vendor/tesseract/worker.min.js',
       langPath:   './vendor/tessdata',
       corePath:   './vendor/tesseract/tesseract-core-simd.wasm.js',

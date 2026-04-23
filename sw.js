@@ -1,4 +1,4 @@
-const CACHE_NAME = 'helal-tarayici-v6';
+const CACHE_NAME = 'helal-tarayici-v7';
 const ASSETS = [
   './',
   './index.html',
@@ -9,6 +9,7 @@ const ASSETS = [
   './data/products.json',
   './data/phrases.json',
   './data/translations.json',
+  './data/ingredients_en.json',
   './js/translator.js',
   './vendor/tesseract/tesseract.min.js',
   './vendor/tesseract/worker.min.js',
