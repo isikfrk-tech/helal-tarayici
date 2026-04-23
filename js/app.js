@@ -3,119 +3,162 @@
 // ── State ──
 let db = null;
 let analyzer = null;
-let currentMode = 'ocr'; // 'ocr' | 'barcode'
+let currentMode = 'ocr';
 let stream = null;
 let html5QrCode = null;
-let history = JSON.parse(localStorage.getItem('scan_history') || '[]');
+let history = [];
 
-// ── DOM refs ──
-const $ = id => document.getElementById(id);
-const screens = {
-  home:   $('screen-home'),
-  scan:   $('screen-scan'),
-  result: $('screen-result')
+// ── DOM helper (güvenli) ──
+function $(id) {
+  const el = document.getElementById(id);
+  if (!el) console.warn('Element bulunamadı:', id);
+  return el;
+}
+
+// ── Global hata yakalama (mobil debug için) ──
+window.onerror = (msg, src, line, col, err) => {
+  showError('JS Hatası: ' + msg + (line ? ' (satır ' + line + ')' : ''));
+  return false;
 };
+window.addEventListener('unhandledrejection', e => {
+  showError('Promise Hatası: ' + (e.reason?.message || e.reason || 'Bilinmiyor'));
+});
+
+function showError(msg) {
+  const box = document.getElementById('error-box');
+  if (box) {
+    box.textContent = '⚠️ ' + msg;
+    box.style.display = 'block';
+    setTimeout(() => { box.style.display = 'none'; }, 8000);
+  }
+  console.error(msg);
+}
 
 // ── Init ──
-async function init() {
-  await loadDatabase();
+document.addEventListener('DOMContentLoaded', () => {
+  history = JSON.parse(localStorage.getItem('scan_history') || '[]');
+  loadDatabase();
   renderHistory();
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
   }
-}
+});
 
 async function loadDatabase() {
   try {
     const res = await fetch('./data/ingredients.json');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     db = await res.json();
     analyzer = new HalalAnalyzer(db);
-  } catch {
-    showToast('Veritabanı yüklenemedi!');
+  } catch (err) {
+    showError('Veritabanı yüklenemedi: ' + err.message);
   }
 }
 
 // ── Navigation ──
 function showScreen(name) {
-  Object.values(screens).forEach(s => s.classList.remove('active'));
-  screens[name].classList.add('active');
+  ['screen-home', 'screen-scan', 'screen-result'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('active');
+  });
+  const target = document.getElementById('screen-' + name);
+  if (target) target.classList.add('active');
 
-  const header = $('main-header');
-  const backBtn = $('back-btn');
-  const headerTitle = $('header-title');
+  const backBtn    = $('back-btn');
+  const titleEl    = $('header-title');
 
   if (name === 'home') {
-    backBtn.style.display = 'none';
-    headerTitle.textContent = 'Helal Tarayıcı';
+    if (backBtn)  backBtn.style.display  = 'none';
+    if (titleEl)  titleEl.textContent    = 'Helal Tarayıcı';
     stopCamera();
   } else if (name === 'scan') {
-    backBtn.style.display = 'flex';
-    headerTitle.textContent = currentMode === 'ocr' ? 'İçindekiler Tara' : 'Barkod Tara';
+    if (backBtn)  backBtn.style.display  = 'flex';
+    if (titleEl)  titleEl.textContent    = currentMode === 'ocr' ? 'İçindekiler Tara' : 'Barkod Tara';
   } else if (name === 'result') {
-    backBtn.style.display = 'flex';
-    headerTitle.textContent = 'Sonuç';
+    if (backBtn)  backBtn.style.display  = 'flex';
+    if (titleEl)  titleEl.textContent    = 'Sonuç';
     stopCamera();
   }
 }
 
-// ── Scan Mode ──
+// ── OCR Modu — kamerayı KULLANICI GESTİ içinde başlat ──
 function startOCR() {
   currentMode = 'ocr';
-  $('scan-frame-hint').textContent = 'İçindekiler listesini çerçeveye al';
-  $('capture-btn').style.display = 'flex';
-  $('gallery-btn').style.display = 'flex';
-  $('barcode-container').style.display = 'none';
-  $('video-container').style.display = 'block';
   showScreen('scan');
-  startCamera();
-}
 
-function startBarcode() {
-  currentMode = 'barcode';
-  $('scan-frame-hint').textContent = 'Barkodu çerçeveye getir';
-  $('capture-btn').style.display = 'none';
-  $('gallery-btn').style.display = 'none';
-  $('video-container').style.display = 'none';
-  $('barcode-container').style.display = 'block';
-  showScreen('scan');
-  startBarcodeReader();
-}
+  const videoContainer  = $('video-container');
+  const barcodeContainer = $('barcode-container');
+  if (videoContainer)   videoContainer.style.display   = 'block';
+  if (barcodeContainer) barcodeContainer.style.display = 'none';
 
-// ── Camera ──
-async function startCamera() {
+  // iOS: getUserMedia kullanıcı gestine doğrudan bağlı olmalı
+  // Hiç async beklemeden hemen çağır
   const video = $('video-preview');
-  try {
-    // iOS için önce arka kamerayı dene, olmazsa herhangi bir kamera
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { exact: 'environment' } }
-      });
-    } catch {
-      stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    }
-    video.srcObject = stream;
-    video.setAttribute('playsinline', true);
-    video.setAttribute('autoplay', true);
-    video.setAttribute('muted', true);
-    await video.play();
-  } catch (err) {
-    showCameraError(err.message);
+  if (!video) { showError('Video elementi bulunamadı'); return; }
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showCameraFallback('Bu tarayıcı kamera erişimini desteklemiyor.');
+    return;
   }
+
+  // Kamera isteği — iOS için zincirsiz, doğrudan çağrı
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+    .then(s => {
+      stream = s;
+      video.srcObject = s;
+      video.setAttribute('playsinline', '');
+      video.setAttribute('muted', '');
+      return video.play();
+    })
+    .then(() => {
+      // iOS bazen environment desteklemez, tekrar dene
+    })
+    .catch(err => {
+      if (err.name === 'OverconstrainedError' || err.name === 'NotFoundError') {
+        // Arka kamera yoksa ön kamera dene
+        navigator.mediaDevices.getUserMedia({ video: true })
+          .then(s => {
+            stream = s;
+            video.srcObject = s;
+            video.setAttribute('playsinline', '');
+            return video.play();
+          })
+          .catch(e2 => showCameraFallback(e2.message));
+      } else if (err.name === 'NotAllowedError') {
+        showCameraFallback('Kamera izni reddedildi. Tarayıcı ayarlarından izin ver.');
+      } else {
+        showCameraFallback(err.message);
+      }
+    });
 }
 
-function showCameraError(msg) {
-  $('video-container').innerHTML = `
-    <div style="padding:32px 20px;text-align:center;color:#7F8C8D;">
+function showCameraFallback(msg) {
+  const vc = $('video-container');
+  if (!vc) return;
+  vc.innerHTML = `
+    <div style="padding:32px 20px;text-align:center;">
       <div style="font-size:48px;margin-bottom:12px;">📵</div>
       <div style="font-size:15px;font-weight:600;margin-bottom:8px;color:#2C3E50;">Kamera açılamadı</div>
-      <div style="font-size:13px;line-height:1.6;margin-bottom:20px;">${msg || 'Kamera izni verilmemiş olabilir.'}</div>
-      <label class="gallery-btn" style="display:inline-flex;padding:14px 24px;border-radius:50px;background:white;border:2px solid #E8ECF0;cursor:pointer;gap:8px;font-size:15px;">
+      <div style="font-size:13px;color:#7F8C8D;line-height:1.6;margin-bottom:20px;">${msg}</div>
+      <label style="display:inline-flex;align-items:center;gap:8px;padding:14px 24px;border-radius:50px;background:white;border:2px solid #E8ECF0;cursor:pointer;font-size:15px;">
         🖼️ Galeriden Fotoğraf Seç
         <input type="file" accept="image/*" style="display:none" onchange="analyzeFromFile(this.files[0])">
       </label>
     </div>`;
 }
 
+// ── Barkod Modu ──
+function startBarcode() {
+  currentMode = 'barcode';
+  showScreen('scan');
+  const vc = $('video-container');
+  const bc = $('barcode-container');
+  if (vc) vc.style.display = 'none';
+  if (bc) bc.style.display = 'block';
+  startBarcodeReader();
+}
+
+// ── Kamera durdur ──
 function stopCamera() {
   if (stream) {
     stream.getTracks().forEach(t => t.stop());
@@ -127,68 +170,76 @@ function stopCamera() {
   }
 }
 
-// ── OCR Capture ──
-async function captureAndAnalyze() {
-  const video = $('video-preview');
+// ── Fotoğraf çek ve analiz et ──
+function captureAndAnalyze() {
+  const video  = $('video-preview');
   const canvas = $('canvas-preview');
+  if (!video || !canvas) return;
 
-  canvas.width  = video.videoWidth  || 640;
-  canvas.height = video.videoHeight || 480;
-  canvas.getContext('2d').drawImage(video, 0, 0);
+  const w = video.videoWidth  || 640;
+  const h = video.videoHeight || 480;
+  canvas.width  = w;
+  canvas.height = h;
+
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, w, h);
   preprocessCanvas(canvas);
-
-  await runOCR(canvas);
+  runOCR(canvas);
 }
 
-async function analyzeFromFile(file) {
+// ── Galeriden seç ──
+function analyzeFromFile(file) {
+  if (!file) return;
   const img = new Image();
   const url = URL.createObjectURL(file);
+  img.onload = () => {
+    const canvas = $('canvas-preview');
+    if (!canvas) return;
+    canvas.width  = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    canvas.getContext('2d').drawImage(img, 0, 0);
+    preprocessCanvas(canvas);
+    URL.revokeObjectURL(url);
+    runOCR(canvas);
+  };
   img.src = url;
-  await img.decode();
-
-  const canvas = $('canvas-preview');
-  canvas.width  = img.naturalWidth;
-  canvas.height = img.naturalHeight;
-  canvas.getContext('2d').drawImage(img, 0, 0);
-  preprocessCanvas(canvas);
-  URL.revokeObjectURL(url);
-
-  await runOCR(canvas);
 }
 
+// ── Görüntü ön işleme (kontrast artır) ──
 function preprocessCanvas(canvas) {
-  const ctx = canvas.getContext('2d');
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const data = imageData.data;
-  for (let i = 0; i < data.length; i += 4) {
-    const gray = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
-    // Kontrast artır
-    const val = Math.min(255, Math.max(0, (gray - 128) * 1.4 + 128));
-    data[i] = data[i+1] = data[i+2] = val;
+  const ctx  = canvas.getContext('2d');
+  const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const d    = data.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const gray = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
+    const val  = Math.min(255, Math.max(0, (gray - 128) * 1.4 + 128));
+    d[i] = d[i+1] = d[i+2] = val;
   }
-  ctx.putImageData(imageData, 0, 0);
+  ctx.putImageData(data, 0, 0);
 }
 
+// ── OCR ──
 async function runOCR(canvas) {
-  showLoading('OCR işleniyor...', 'İlk açılışta ~40MB Çince dil paketi indirilir');
+  if (!analyzer) {
+    showError('Veritabanı henüz yüklenmedi, bir saniye bekle.');
+    return;
+  }
+  showLoading('OCR işleniyor...', 'İlk kullanımda ~40MB Çince paketi indirilir');
   try {
     const { createWorker } = Tesseract;
     const worker = await createWorker('chi_sim', 1, {
       workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js',
-      langPath: 'https://cdn.jsdelivr.net/npm/tesseract.js-data@4.0.0/tessdata_best',
-      corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/tesseract-core-simd-lstm.wasm.js',
+      langPath:   'https://cdn.jsdelivr.net/npm/tesseract.js-data@4.0.0/tessdata_best',
+      corePath:   'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/tesseract-core-simd-lstm.wasm.js',
       logger: m => {
-        if (m.status === 'loading tesseract core') {
-          $('loading-sub').textContent = 'Tesseract yükleniyor...';
-        } else if (m.status === 'loading language traineddata') {
-          $('loading-sub').textContent = 'Çince dil paketi indiriliyor (~40MB, tek seferlik)...';
-        } else if (m.status === 'recognizing text') {
-          $('loading-sub').textContent = `Metin okunuyor: %${Math.round(m.progress * 100)}`;
-        }
+        if (m.status === 'loading tesseract core')       $('loading-sub').textContent = 'Tesseract yükleniyor...';
+        else if (m.status === 'loading language traineddata') $('loading-sub').textContent = 'Çince paketi indiriliyor (~40MB)...';
+        else if (m.status === 'recognizing text')        $('loading-sub').textContent = `Metin okunuyor: %${Math.round(m.progress * 100)}`;
       }
     });
     const { data: { text } } = await worker.recognize(canvas);
     await worker.terminate();
+
     if (!text || text.trim().length < 2) {
       hideLoading();
       showToast('Metin okunamadı. Daha yakın ve net bir fotoğraf çek.');
@@ -199,28 +250,27 @@ async function runOCR(canvas) {
   } catch (err) {
     hideLoading();
     const msg = err.message || '';
-    if (msg.includes('network') || msg.includes('fetch')) {
-      showToast('İnternet bağlantısı gerekli (ilk kullanımda dil paketi indirilir).');
+    if (msg.includes('network') || msg.includes('fetch') || msg.includes('load')) {
+      showToast('İnternet gerekli — ilk kullanımda dil paketi indirilir.');
     } else {
-      showToast('OCR hatası: ' + msg);
+      showError('OCR hatası: ' + msg);
     }
   }
 }
 
-// ── Barcode ──
+// ── Barkod ──
 async function startBarcodeReader() {
-  await loadScript('https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js');
-
-  html5QrCode = new Html5Qrcode('barcode-reader');
   try {
+    await loadScript('https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js');
+    html5QrCode = new Html5Qrcode('barcode-reader');
     await html5QrCode.start(
       { facingMode: 'environment' },
       { fps: 10, qrbox: { width: 240, height: 120 } },
       onBarcodeDetected,
       () => {}
     );
-  } catch {
-    showToast('Kameraya erişilemedi.');
+  } catch (err) {
+    showError('Barkod okuyucu başlatılamadı: ' + err.message);
   }
 }
 
@@ -229,94 +279,88 @@ async function onBarcodeDetected(barcode) {
   html5QrCode = null;
   showLoading('Ürün aranıyor...', barcode);
 
-  // 1. Önce localStorage'daki önbellekte ara
   const cached = getCachedProduct(barcode);
-  if (cached) {
-    hideLoading();
-    showResult(cached.verdict, '', barcode, cached.name);
-    return;
-  }
+  if (cached) { hideLoading(); showResult(cached.verdict, '', barcode, cached.name); return; }
 
-  // 2. İnternette Open Food Facts'e bak
   try {
     const res  = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
     const data = await res.json();
     if (data.status === 1) {
-      const product = data.product;
-      const ingText =
-        product.ingredients_text_zh ||
-        product.ingredients_text_zh_CN ||
-        product.ingredients_text || '';
-      const name = product.product_name_zh || product.product_name || barcode;
+      const p       = data.product;
+      const ingText = p.ingredients_text_zh || p.ingredients_text_zh_CN || p.ingredients_text || '';
+      const name    = p.product_name_zh || p.product_name || barcode;
       const verdict = analyzer.analyze(ingText);
       cacheProduct(barcode, name, verdict);
       hideLoading();
       showResult(verdict, ingText, barcode, name);
       return;
     }
-  } catch { /* offline veya ürün bulunamadı */ }
+  } catch { /* offline veya bulunamadı */ }
 
   hideLoading();
-  showToast('Ürün veritabanında bulunamadı. İçindekiler modunu dene.');
+  showToast('Ürün bulunamadı. İçindekiler modunu dene.');
   showScreen('home');
 }
 
-// ── Product Cache ──
+// ── Ürün cache ──
 function getCachedProduct(barcode) {
-  const db = JSON.parse(localStorage.getItem('products_db') || '{}');
-  return db[barcode] || null;
+  const store = JSON.parse(localStorage.getItem('products_db') || '{}');
+  return store[barcode] || null;
 }
-
 function cacheProduct(barcode, name, verdict) {
-  const db = JSON.parse(localStorage.getItem('products_db') || '{}');
-  db[barcode] = { name, verdict, date: new Date().toISOString() };
-  localStorage.setItem('products_db', JSON.stringify(db));
+  const store = JSON.parse(localStorage.getItem('products_db') || '{}');
+  store[barcode] = { name, verdict, date: new Date().toISOString() };
+  localStorage.setItem('products_db', JSON.stringify(store));
 }
 
-// ── Result ──
+// ── Sonuç göster ──
 function showResult(verdict, ocrText, barcode, productName) {
   hideLoading();
 
   const header = $('result-header');
-  header.style.background = verdict.bgColor || '#F8F9FA';
-  $('result-icon').textContent  = verdict.icon;
-  $('result-title').textContent = verdict.title;
-  $('result-title').style.color = verdict.color;
-  $('result-message').textContent = verdict.message;
+  if (header) header.style.background = verdict.bgColor || '#F8F9FA';
 
-  // OCR metni
+  const iconEl   = $('result-icon');
+  const titleEl2 = $('result-title');
+  const msgEl    = $('result-message');
+
+  if (iconEl)   iconEl.textContent   = verdict.icon;
+  if (titleEl2) { titleEl2.textContent = verdict.title; titleEl2.style.color = verdict.color; }
+  if (msgEl)    msgEl.textContent    = verdict.message;
+
   const ocrBox = $('ocr-box');
-  if (ocrText && ocrText.trim()) {
-    ocrBox.style.display = 'block';
-    $('ocr-raw-text').textContent = ocrText.trim().substring(0, 300);
-  } else {
-    ocrBox.style.display = 'none';
+  const ocrRaw = $('ocr-raw-text');
+  if (ocrBox && ocrRaw) {
+    if (ocrText && ocrText.trim()) {
+      ocrBox.style.display = 'block';
+      ocrRaw.textContent   = ocrText.trim().substring(0, 300);
+    } else {
+      ocrBox.style.display = 'none';
+    }
   }
 
-  // Detay etiketleri
-  const tagsContainer = $('ingredient-tags');
-  tagsContainer.innerHTML = '';
-  const { haram, suspicious, halal_check } = verdict.details || {};
-  (haram || []).forEach(i => {
-    tagsContainer.insertAdjacentHTML('beforeend',
-      `<span class="ingredient-tag tag-haram">${i.chinese} ${i.turkish}</span>`);
-  });
-  (suspicious || []).forEach(i => {
-    tagsContainer.insertAdjacentHTML('beforeend',
-      `<span class="ingredient-tag tag-suspicious">⚠️ ${i.chinese} ${i.turkish}</span>`);
-  });
-  (halal_check || []).forEach(i => {
-    tagsContainer.insertAdjacentHTML('beforeend',
-      `<span class="ingredient-tag tag-check">🔍 ${i.chinese} ${i.turkish}</span>`);
-  });
-  $('details-section').style.display =
-    (haram?.length || suspicious?.length || halal_check?.length) ? 'block' : 'none';
+  const tagsEl = $('ingredient-tags');
+  if (tagsEl) {
+    tagsEl.innerHTML = '';
+    const { haram = [], suspicious = [], halal_check = [] } = verdict.details || {};
+    haram.forEach(i => tagsEl.insertAdjacentHTML('beforeend',
+      `<span class="ingredient-tag tag-haram">${i.chinese} ${i.turkish}</span>`));
+    suspicious.forEach(i => tagsEl.insertAdjacentHTML('beforeend',
+      `<span class="ingredient-tag tag-suspicious">⚠️ ${i.chinese} ${i.turkish}</span>`));
+    halal_check.forEach(i => tagsEl.insertAdjacentHTML('beforeend',
+      `<span class="ingredient-tag tag-check">🔍 ${i.chinese} ${i.turkish}</span>`));
 
-  // Ürün adı
-  $('product-name-row').style.display = productName ? 'block' : 'none';
-  if (productName) $('product-name-text').textContent = productName;
+    const detailsEl = $('details-section');
+    if (detailsEl) detailsEl.style.display = (haram.length || suspicious.length || halal_check.length) ? 'block' : 'none';
+  }
 
-  // Geçmişe kaydet
+  const nameRow = $('product-name-row');
+  const nameText = $('product-name-text');
+  if (nameRow && nameText) {
+    nameRow.style.display = productName ? 'block' : 'none';
+    if (productName) nameText.textContent = productName;
+  }
+
   saveToHistory({
     id: Date.now(),
     icon: verdict.icon,
@@ -331,7 +375,7 @@ function showResult(verdict, ocrText, barcode, productName) {
   showScreen('result');
 }
 
-// ── History ──
+// ── Geçmiş ──
 function saveToHistory(entry) {
   history.unshift(entry);
   if (history.length > 50) history = history.slice(0, 50);
@@ -342,16 +386,10 @@ function saveToHistory(entry) {
 function renderHistory() {
   const list = $('history-list');
   if (!list) return;
-
   if (history.length === 0) {
-    list.innerHTML = `
-      <div class="empty-history">
-        <div class="empty-icon">📋</div>
-        <p>Henüz tarama yapmadın.<br>Bir ürün tara, burada görünür.</p>
-      </div>`;
+    list.innerHTML = `<div class="empty-history"><div class="empty-icon">📋</div><p>Henüz tarama yapmadın.<br>Bir ürün tara, burada görünür.</p></div>`;
     return;
   }
-
   list.innerHTML = history.slice(0, 10).map(h => `
     <div class="history-item" onclick="replayHistory(${h.id})">
       <span class="history-icon">${h.icon}</span>
@@ -359,52 +397,51 @@ function renderHistory() {
         <div class="name">${h.name}</div>
         <div class="date">${h.date}</div>
       </div>
-      <span class="history-status" style="color:${h.color};background:${hexToRgba(h.color, 0.12)}">${h.title.split(' ').slice(0,2).join(' ')}</span>
+      <span class="history-status" style="color:${h.color};background:${hexToRgba(h.color,0.12)}">${h.title.split(' ').slice(0,2).join(' ')}</span>
     </div>`).join('');
 }
 
 function replayHistory(id) {
   const entry = history.find(h => h.id === id);
-  if (!entry) return;
-  showResult(entry.verdict, entry.ocrText || '', entry.barcode, entry.name !== 'Manuel tarama' ? entry.name : null);
+  if (entry) showResult(entry.verdict, entry.ocrText || '', entry.barcode, entry.name !== 'Manuel tarama' ? entry.name : null);
 }
 
 function hexToRgba(hex, a) {
-  const r = parseInt(hex.slice(1,3),16);
-  const g = parseInt(hex.slice(3,5),16);
-  const b = parseInt(hex.slice(5,7),16);
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
   return `rgba(${r},${g},${b},${a})`;
 }
 
 // ── Loading ──
 function showLoading(text, sub) {
-  $('loading-text').textContent = text || 'Yükleniyor...';
-  $('loading-sub').textContent  = sub  || '';
-  $('loading-overlay').classList.add('active');
+  const ol = $('loading-overlay');
+  const lt = $('loading-text');
+  const ls = $('loading-sub');
+  if (lt) lt.textContent = text || 'Yükleniyor...';
+  if (ls) ls.textContent = sub  || '';
+  if (ol) ol.classList.add('active');
 }
 function hideLoading() {
-  $('loading-overlay').classList.remove('active');
+  const ol = $('loading-overlay');
+  if (ol) ol.classList.remove('active');
 }
 
 // ── Toast ──
 let toastTimer;
 function showToast(msg) {
   const t = $('toast');
+  if (!t) return;
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 4000);
 }
 
-// ── Script loader ──
+// ── Script yükleyici ──
 function loadScript(src) {
   return new Promise((resolve, reject) => {
     if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
     const s = document.createElement('script');
-    s.src = src; s.onload = resolve; s.onerror = reject;
+    s.src = src; s.onload = resolve; s.onerror = () => reject(new Error('Script yüklenemedi: ' + src));
     document.head.appendChild(s);
   });
 }
-
-// ── Start ──
-document.addEventListener('DOMContentLoaded', init);
