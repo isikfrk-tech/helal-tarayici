@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Eski cache'leri temizle, sonra yeni SW kaydet
   if ('caches' in window) {
     caches.keys().then(keys => {
-      keys.filter(k => k !== 'helal-tarayici-v5').forEach(k => caches.delete(k));
+      keys.filter(k => k !== 'helal-tarayici-v6').forEach(k => caches.delete(k));
     });
   }
   if ('serviceWorker' in navigator) {
@@ -69,12 +69,21 @@ function showDebug(msg) {
   }
 }
 
+let translator = null;
+
 async function loadDatabase() {
   try {
-    const res = await fetch('./data/ingredients.json');
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    db = await res.json();
+    const [ingRes, trRes] = await Promise.all([
+      fetch('./data/ingredients.json'),
+      fetch('./data/translations.json')
+    ]);
+    if (!ingRes.ok) throw new Error('HTTP ' + ingRes.status);
+    db = await ingRes.json();
     analyzer = new HalalAnalyzer(db);
+    if (trRes.ok) {
+      const trData = await trRes.json();
+      translator = new Translator(trData);
+    }
   } catch (err) {
     showError('Veritabanı yüklenemedi: ' + err.message);
   }
@@ -486,6 +495,9 @@ function showResult(verdict, ocrText, barcode, productName) {
     if (productName) nameText.textContent = productName;
   }
 
+  // Çeviri bölümü
+  renderTranslation(ocrText);
+
   saveToHistory({
     id: Date.now(),
     icon: verdict.icon,
@@ -498,6 +510,47 @@ function showResult(verdict, ocrText, barcode, productName) {
   });
 
   showScreen('result');
+}
+
+// ── Çeviri ──
+function renderTranslation(rawText) {
+  const section  = $('translation-section');
+  const typeEl   = $('product-type');
+  const listEl   = $('translation-list');
+  if (!section || !listEl) return;
+
+  if (!translator || !rawText || rawText.trim().length < 2) {
+    section.style.display = 'none';
+    return;
+  }
+
+  const items       = translator.translateIngredients(rawText);
+  const productType = translator.guessProductType(rawText);
+
+  if (items.length === 0) { section.style.display = 'none'; return; }
+
+  // Ürün türü
+  if (typeEl) {
+    typeEl.style.display = productType ? 'block' : 'none';
+    if (productType) typeEl.textContent = productType;
+  }
+
+  // İçerik listesi
+  listEl.innerHTML = items.map(i => {
+    const isWarning = i.turkish && i.turkish.includes('⚠️');
+    const color = isWarning ? '#E74C3C' : (i.matched ? '#2C3E50' : '#95A5A6');
+    const turkish = i.turkish
+      ? `<span style="color:${color}">${i.turkish}</span>`
+      : `<span style="color:#BDC3C7;font-style:italic">Bilinmiyor</span>`;
+    return `
+      <div class="tr-row">
+        <span class="tr-chinese">${i.original}</span>
+        <span class="tr-arrow">→</span>
+        ${turkish}
+      </div>`;
+  }).join('');
+
+  section.style.display = 'block';
 }
 
 // ── Geçmiş ──

@@ -371,6 +371,20 @@ body {
   line-height: 1.5;
 }
 
+/* ── ÇEVİRİ SATIRLARI ── */
+.tr-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid #F8F9FA;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.tr-row:last-child { border-bottom: none; }
+.tr-chinese { font-weight: 600; color: #2C3E50; min-width: 80px; flex-shrink: 0; }
+.tr-arrow   { color: #BDC3C7; flex-shrink: 0; }
+
 /* ── KALIPLAR ── */
 .phrase-list { display: flex; flex-direction: column; gap: 14px; }
 
