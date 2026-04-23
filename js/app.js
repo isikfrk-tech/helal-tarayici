@@ -36,13 +36,37 @@ function showError(msg) {
 
 // ── Init ──
 document.addEventListener('DOMContentLoaded', () => {
+  // Eski servis worker'ı ve cache'i tamamen temizle (iOS inatçılığı için)
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(regs => {
+      regs.forEach(r => r.unregister());
+    });
+  }
+  if ('caches' in window) {
+    caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+  }
+
   history = JSON.parse(localStorage.getItem('scan_history') || '[]');
   loadDatabase();
   renderHistory();
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
-  }
+
+  // Tıklama teşhisi — her butona görünür tepki ekle
+  document.querySelectorAll('.scan-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      showDebug('Tıklama algılandı ✓');
+    });
+  });
+
+  showDebug('Uygulama yüklendi · ' + new Date().toLocaleTimeString('tr-TR'));
 });
+
+function showDebug(msg) {
+  const box = document.getElementById('debug-box');
+  if (box) {
+    box.textContent = msg;
+    box.style.display = 'block';
+  }
+}
 
 async function loadDatabase() {
   try {
