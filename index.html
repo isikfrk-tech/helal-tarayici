@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#2ECC71">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Helal Tarayıcı">
+  <title>Helal Tarayıcı</title>
+  <link rel="manifest" href="./manifest.json">
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header class="header" id="main-header">
+  <button class="back-btn" id="back-btn" style="display:none" onclick="showScreen('home')">←</button>
+  <span class="header-logo">☪️</span>
+  <div>
+    <h1 id="header-title">Helal Tarayıcı</h1>
+    <div class="subtitle">Çin ürünleri helal kontrolü</div>
+  </div>
+</header>
+
+<!-- ══════════════════════════════════════════
+     EKRAN 1 — ANA SAYFA
+═══════════════════════════════════════════ -->
+<div id="screen-home" class="screen active">
+
+  <div class="welcome-card">
+    <div class="emoji">🔍</div>
+    <h2>Ürünü Tara, Emin Ol</h2>
+    <p>İçindekiler fotoğrafını çek veya barkodu tara — uygulama haram/şüpheli içerikleri anında tespit eder.</p>
+  </div>
+
+  <div class="scan-options">
+    <button class="scan-btn" onclick="startOCR()">
+      <div class="btn-icon green">📷</div>
+      <div class="btn-text">
+        <h3>İçindekiler Tara</h3>
+        <p>Ürünün içindekiler listesini fotoğrafla. Çince OCR ile analiz edilir.</p>
+      </div>
+    </button>
+
+    <button class="scan-btn" onclick="startBarcode()">
+      <div class="btn-icon blue">|||</div>
+      <div class="btn-text">
+        <h3>Barkod Tara</h3>
+        <p>Ürün barkodunu tara. Online veritabanından ürünü tanıma dener.</p>
+      </div>
+    </button>
+  </div>
+
+  <!-- Son taramalar -->
+  <div class="section-title">Son Taramalar</div>
+  <div class="history-list" id="history-list"></div>
+
+</div><!-- /screen-home -->
+
+
+<!-- ══════════════════════════════════════════
+     EKRAN 2 — TARAMA
+═══════════════════════════════════════════ -->
+<div id="screen-scan" class="screen">
+
+  <!-- OCR kamera -->
+  <div id="video-container">
+    <div class="camera-area">
+      <video id="video-preview" autoplay playsinline muted></video>
+      <canvas id="canvas-preview"></canvas>
+      <div class="camera-overlay">
+        <div class="scan-frame"></div>
+        <div class="scan-hint" id="scan-frame-hint">İçindekiler listesini çerçeveye al</div>
+      </div>
+    </div>
+
+    <div class="scan-controls">
+      <button class="capture-btn" id="capture-btn" onclick="captureAndAnalyze()">
+        📷 Fotoğraf Çek ve Analiz Et
+      </button>
+      <label class="gallery-btn">
+        🖼️ Galeriden Seç
+        <input type="file" id="file-input" accept="image/*" onchange="analyzeFromFile(this.files[0])">
+      </label>
+    </div>
+  </div>
+
+  <!-- Barkod okuyucu -->
+  <div id="barcode-container" style="display:none; padding:20px;">
+    <div class="info-badge">
+      📡 Barkod okunduğunda otomatik analiz başlar. İnternet bağlantısı ile ürün veritabanında arama yapılır.
+    </div>
+    <div id="barcode-reader"></div>
+  </div>
+
+</div><!-- /screen-scan -->
+
+
+<!-- ══════════════════════════════════════════
+     EKRAN 3 — SONUÇ
+═══════════════════════════════════════════ -->
+<div id="screen-result" class="screen">
+
+  <div class="result-card">
+    <div class="result-header" id="result-header">
+      <div class="result-icon" id="result-icon">⏳</div>
+      <div class="result-title" id="result-title">Analiz ediliyor...</div>
+      <div class="result-message" id="result-message"></div>
+    </div>
+
+    <!-- Ürün adı (barkod için) -->
+    <div id="product-name-row" style="display:none; padding:0 20px 14px; border-top:1px solid #F0F0F0;">
+      <div style="font-size:12px;color:#7F8C8D;margin-bottom:4px;padding-top:14px;">Ürün</div>
+      <div id="product-name-text" style="font-size:15px;font-weight:600;"></div>
+    </div>
+
+    <!-- Tespit edilen içerikler -->
+    <div id="details-section" class="result-details" style="display:none">
+      <h4>Tespit Edilen İçerikler</h4>
+      <div id="ingredient-tags"></div>
+    </div>
+
+    <!-- Ham OCR metni -->
+    <div id="ocr-box" class="ocr-result-box" style="display:none; margin:0 20px 16px;">
+      <h4>Okunan Metin (ham)</h4>
+      <div id="ocr-raw-text" class="ocr-text"></div>
+    </div>
+  </div>
+
+  <div class="action-btns">
+    <button class="action-btn btn-primary" onclick="startOCR()">📷 Yeni Tarama</button>
+    <button class="action-btn btn-secondary" onclick="showScreen('home')">← Ana Sayfa</button>
+  </div>
+
+</div><!-- /screen-result -->
+
+
+<!-- ── LOADING OVERLAY ── -->
+<div class="loading-overlay" id="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-text" id="loading-text">İşleniyor...</div>
+  <div class="loading-sub"  id="loading-sub"></div>
+</div>
+
+<!-- ── TOAST ── -->
+<div class="toast" id="toast"></div>
+
+<!-- ── SCRIPTS ── -->
+<!-- Tesseract.js — ilk kullanımda ~40MB Çince paket indirir, sonra offline çalışır -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="./js/analyzer.js"></script>
+<script src="./js/app.js"></script>
+
+</body>
+</html>
