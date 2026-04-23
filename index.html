@@ -43,6 +43,14 @@
       </div>
     </button>
 
+    <button class="scan-btn" onclick="startPaste()">
+      <div class="btn-icon" style="background:#FEF3E7;">📝</div>
+      <div class="btn-text">
+        <h3>Metin Yapıştır</h3>
+        <p>iPhone Live Text ile kopyaladığın Çince metni yapıştır, anında analiz edilsin.</p>
+      </div>
+    </button>
+
     <button class="scan-btn" onclick="startBarcode()">
       <div class="btn-icon blue">|||</div>
       <div class="btn-text">
@@ -95,6 +103,26 @@
   </div>
 
 </div><!-- /screen-scan -->
+
+
+<!-- ══════════════════════════════════════════
+     EKRAN — METİN YAPIŞTIR
+═══════════════════════════════════════════ -->
+<div id="screen-paste" class="screen">
+
+  <div class="info-badge">
+    💡 <strong>iPhone ipucu:</strong> Fotoğrafı aç → Çince yazıya dokun → <strong>Metni Seç</strong> → Kopyala → buraya yapıştır.
+  </div>
+
+  <textarea id="paste-textarea"
+    placeholder="Çince içerik metnini buraya yapıştır...&#10;&#10;Örnek:&#10;配料：小麦粉、白砂糖、猪油、鸡蛋、食用盐..."
+    style="width:100%;min-height:240px;padding:16px;border-radius:14px;border:2px solid #E8ECF0;font-size:15px;line-height:1.6;font-family:inherit;resize:vertical;background:white;"></textarea>
+
+  <button class="action-btn btn-primary" style="margin-top:16px;" onclick="analyzePastedText()">
+    🔍 Metni Analiz Et
+  </button>
+
+</div><!-- /screen-paste -->
 
 
 <!-- ══════════════════════════════════════════
@@ -154,7 +182,7 @@
 
 <!-- ── SCRIPTS ── -->
 <!-- Tesseract.js — ilk kullanımda ~40MB Çince paket indirir, sonra offline çalışır -->
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="./vendor/tesseract/tesseract.min.js"></script>
 <script src="./js/analyzer.js"></script>
 <script src="./js/app.js"></script>
 

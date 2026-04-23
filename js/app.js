@@ -36,14 +36,14 @@ function showError(msg) {
 
 // ── Init ──
 document.addEventListener('DOMContentLoaded', () => {
-  // Eski servis worker'ı ve cache'i tamamen temizle (iOS inatçılığı için)
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then(regs => {
-      regs.forEach(r => r.unregister());
+  // Eski cache'leri temizle, sonra yeni SW kaydet
+  if ('caches' in window) {
+    caches.keys().then(keys => {
+      keys.filter(k => k !== 'helal-tarayici-v4').forEach(k => caches.delete(k));
     });
   }
-  if ('caches' in window) {
-    caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
   }
 
   history = JSON.parse(localStorage.getItem('scan_history') || '[]');
@@ -81,7 +81,7 @@ async function loadDatabase() {
 
 // ── Navigation ──
 function showScreen(name) {
-  ['screen-home', 'screen-scan', 'screen-result'].forEach(id => {
+  ['screen-home', 'screen-scan', 'screen-paste', 'screen-result'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.classList.remove('active');
   });
@@ -98,6 +98,10 @@ function showScreen(name) {
   } else if (name === 'scan') {
     if (backBtn)  backBtn.style.display  = 'flex';
     if (titleEl)  titleEl.textContent    = currentMode === 'ocr' ? 'İçindekiler Tara' : 'Barkod Tara';
+  } else if (name === 'paste') {
+    if (backBtn)  backBtn.style.display  = 'flex';
+    if (titleEl)  titleEl.textContent    = 'Metin Yapıştır';
+    stopCamera();
   } else if (name === 'result') {
     if (backBtn)  backBtn.style.display  = 'flex';
     if (titleEl)  titleEl.textContent    = 'Sonuç';
@@ -169,6 +173,21 @@ function showCameraFallback(msg) {
         <input type="file" accept="image/*" style="display:none" onchange="analyzeFromFile(this.files[0])">
       </label>
     </div>`;
+}
+
+// ── Metin Yapıştırma Modu ──
+function startPaste() {
+  showScreen('paste');
+  const ta = $('paste-textarea');
+  if (ta) { ta.value = ''; setTimeout(() => ta.focus(), 100); }
+}
+
+function analyzePastedText() {
+  if (!analyzer) { showError('Veritabanı henüz yüklenmedi.'); return; }
+  const text = ($('paste-textarea')?.value || '').trim();
+  if (text.length < 2) { showToast('Önce metni yapıştır.'); return; }
+  const verdict = analyzer.analyze(text);
+  showResult(verdict, text, null);
 }
 
 // ── Barkod Modu ──
@@ -252,12 +271,12 @@ async function runOCR(canvas) {
   try {
     const { createWorker } = Tesseract;
     const worker = await createWorker('chi_sim', 1, {
-      workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js',
-      langPath:   'https://cdn.jsdelivr.net/npm/tesseract.js-data@4.0.0/tessdata_best',
-      corePath:   'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/tesseract-core-simd-lstm.wasm.js',
+      workerPath: './vendor/tesseract/worker.min.js',
+      langPath:   './vendor/tessdata',
+      corePath:   './vendor/tesseract/tesseract-core-simd.wasm.js',
       logger: m => {
-        if (m.status === 'loading tesseract core')       $('loading-sub').textContent = 'Tesseract yükleniyor...';
-        else if (m.status === 'loading language traineddata') $('loading-sub').textContent = 'Çince paketi indiriliyor (~40MB)...';
+        if (m.status === 'loading tesseract core')       $('loading-sub').textContent = 'OCR motoru yükleniyor...';
+        else if (m.status === 'loading language traineddata') $('loading-sub').textContent = 'Çince paketi yükleniyor (~2MB)...';
         else if (m.status === 'recognizing text')        $('loading-sub').textContent = `Metin okunuyor: %${Math.round(m.progress * 100)}`;
       }
     });

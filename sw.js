@@ -1,4 +1,4 @@
-const CACHE_NAME = 'helal-tarayici-v3';
+const CACHE_NAME = 'helal-tarayici-v4';
 const ASSETS = [
   './',
   './index.html',
@@ -6,7 +6,12 @@ const ASSETS = [
   './js/app.js',
   './js/analyzer.js',
   './data/ingredients.json',
-  './data/products.json'
+  './data/products.json',
+  './vendor/tesseract/tesseract.min.js',
+  './vendor/tesseract/worker.min.js',
+  './vendor/tesseract/tesseract-core-simd.wasm.js',
+  './vendor/tesseract/tesseract-core-simd.wasm',
+  './vendor/tessdata/chi_sim.traineddata.gz'
 ];
 
 self.addEventListener('install', e => {
